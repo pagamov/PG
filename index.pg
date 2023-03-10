@@ -1,0 +1,5 @@
+a : int = 4 ;
+input a ;
+a = a + 4 ;
+output a ;
+
