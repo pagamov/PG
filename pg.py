@@ -65,8 +65,8 @@ class Stack:
         types = ['void', 'int', 'string']
         inFuncs = ['in', 'out', 'def']
 
-    def addVar(self, name, type):
-        self.vars[name] = type
+    def addVar(self, name, type, size):
+        self.vars[name] = {'type': type, 'size': size}
 
     def addFunc(self, name, type):
         self.funcs[name] = type
@@ -104,14 +104,14 @@ class Stack:
         if self.state == self.States.DEFAULT:
             code = ''
 # mark stack with types
-            self.definePattern(False)
+            self.definePattern(True)
             if verbose:
                 print("\033[94mcolapse: Stack after definePattern\033[0m")
                 for item in self.stack:
                     print(f"{item['value']} : {item['type']}")
                 print()
 # transform stack with types to code
-            self.code = self.code + self.applyPattern(False)
+            self.code = self.code + self.applyPattern(True)
         elif self.state == self.States.COMMENT:
             code = ''
             while True:
@@ -120,7 +120,7 @@ class Stack:
                     code = '\n// ' + code
                     break
                 else:
-                    code = p + code
+                    code = p + ' ' + code
             self.code = self.code + code
 
     def definePattern(self, verbose=False):
@@ -159,23 +159,30 @@ class Stack:
             print([item['type'] for item in self.stack])
             print()
 
-        if len(self.stack) >= 2:
-            line = [item['type'] for item in self.stack[::-1][:2]][::-1]
-            if line == [self.Types.VAR_TYPE, self.Types.OPERATOR_TYPE]: # a (++ --) ;
-                code = f"\n{self.stack[-2]['value']} = {self.stack[-2]['value']} {self.stack[-1]['value'][0]} 1;"
-                for i in range(2):
+        if len(self.stack) >= 5:
+            line = [item['type'] for item in self.stack[::-1][:5]][::-1]
+            if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.OPERATOR_TYPE, self.Types.INT_TYPE]: # def type none operator int
+# TODO : check if var already in self.vars param 
+                code = f"\n{self.stack[-4]['value']} {self.stack[-3]['value']} {self.stack[-2]['value']} {self.stack[-1]['value']};"
+                self.addVar(self.stack[-3]['value'], self.stack[-4]['value'], 4)
+                for i in range(5):
                     self.stack.pop()
                 return code
-            elif line == [self.Types.OPERATOR_TYPE, self.Types.VAR_TYPE]:  # (++ --) a ;
-                code = f"\n{self.stack[-1]['value']} = {self.stack[-1]['value']} {self.stack[-2]['value'][0]} 1;"
-                for i in range(2):
+
+        if len(self.stack) >= 4:
+            line = [item['type'] for item in self.stack[::-1][:4]][::-1]
+            if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.INT_TYPE]: # def string none size
+                code = f"\nchar {self.stack[-2]['value']}[{self.stack[-1]['value']}];"
+                self.addVar(self.stack[-2]['value'], self.stack[-3]['value'], self.stack[-1]['value'])
+                for i in range(4):
                     self.stack.pop()
                 return code
+
         if len(self.stack) >= 3:
             line = [item['type'] for item in self.stack[::-1][:3]][::-1]
             if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None]:   # def int a ;
 # TODO : add type to new var
-                self.addVar(self.stack[-1]['value'], self.stack[-2]['value'])
+                self.addVar(self.stack[-1]['value'], self.stack[-2]['value'], 4)
                 code = f"\n{self.stack[-2]['value']} {self.stack[-1]['value']};"
                 for i in range(3):
                     self.stack.pop()
@@ -187,7 +194,15 @@ class Stack:
                 for i in range(3):
                     self.stack.pop()
                 return code
-            elif line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, self.Types.VAR_TYPE]:
+            elif line == [self.Types.VAR_TYPE, self.Types.OPERATOR_TYPE, self.Types.VAR_TYPE]: # var (+= -= *= /=) var ;
+# check if they are same type
+# if var int (+= -= *= /=) var int
+                if self.vars[self.stack[-1]['value']]['type'] == 'int' and self.vars[self.stack[-3]['value']]['type'] == 'int':
+                    code = f"\n{self.stack[-3]['value']} {self.stack[-2]['value']} {self.stack[-1]['value']};"
+                for i in range(3):
+                    self.stack.pop()
+                return code
+            elif line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, self.Types.VAR_TYPE]: # (in out) type var ;
 # in int a ;
 # TODO : check for var type
                 if self.stack[-3]['value'] == 'in':
@@ -201,25 +216,22 @@ class Stack:
                         self.stack.pop()
                     return code
                 else:
-                    raise Exception('applyPattern: no in func to match')
+                    raise Exception('\033[91mapplyPattern: no in func to match\033[0m')
 
-        if len(self.stack) >= 4:
-            pass
-        
-        if len(self.stack) >= 5:
-            line = [item['type'] for item in self.stack[::-1][:5]][::-1]
-
-            if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.OPERATOR_TYPE, self.Types.INT_TYPE]:
-# TODO : check if var already in self.vars param 
-                code = f"\n{self.stack[-4]['value']} {self.stack[-3]['value']} {self.stack[-2]['value']} {self.stack[-1]['value']};"
-                self.addVar(self.stack[-3]['value'], self.stack[-4]['value'])
-                for i in range(5):
+        if len(self.stack) >= 2:
+            line = [item['type'] for item in self.stack[::-1][:2]][::-1]
+            if line == [self.Types.VAR_TYPE, self.Types.OPERATOR_TYPE]: # a (++ --) ;
+                code = f"\n{self.stack[-2]['value']} = {self.stack[-2]['value']} {self.stack[-1]['value'][0]} 1;"
+                for i in range(2):
                     self.stack.pop()
                 return code
-
-
-
-        raise Exception('applyPattern: cant find pattern')
+            elif line == [self.Types.OPERATOR_TYPE, self.Types.VAR_TYPE]:  # (++ --) a ;
+# TODO : conflict with var += var ; 
+                code = f"\n{self.stack[-1]['value']} = {self.stack[-1]['value']} {self.stack[-2]['value'][0]} 1;"
+                for i in range(2):
+                    self.stack.pop()
+                return code
+        raise Exception('\033[91mapplyPattern: cant find pattern\033[0m')
         return f'error: {self.stack}'
         
 if __name__ == "__main__":

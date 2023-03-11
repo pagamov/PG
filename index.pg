@@ -3,6 +3,8 @@
     ;; def int a ; ;;
     def int a = 10 ;
 
+    def string b 10 ;
+
     in int a    ;
     a += 4  ;
 
@@ -16,4 +18,12 @@ a ++ ;
 a -- ; 
 ++ a ;
 -- a ;
+
+def int c = 10 ;
+a += c ;
+a -= c ;
+a *= c ;
+a /= c ;
+
+
 
