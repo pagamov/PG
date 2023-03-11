@@ -1,18 +1,15 @@
 
-    ;; coment ;;
-    ;; def int a ; ;;
-    def int a = 10 ;
+;; coment ;;
+;; def int a ; ;;
+def int a = 10 ;
+in int a ;
 
-    def string b 10 ;
+a += 4  ;
+a -= 5  ;
+a *= 10 ;
+a /= 2 ;
 
-    in int a    ;
-    a += 4  ;
-
-    a -= 5  ;
-    a   *=  10  ;
-    a   /=  2   ;
-
-    out int a ;
+out int a ;
 
 a ++ ;
 a -- ; 
@@ -24,6 +21,18 @@ a += c ;
 a -= c ;
 a *= c ;
 a /= c ;
+
+;; def string b 10 ; ;;
+
+;; b = some text and more; ;;
+
+def string b = some text ;
+
+;; b = some new text ; ;;
+
+in string b ;
+
+
 
 
 

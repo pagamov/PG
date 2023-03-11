@@ -12,9 +12,11 @@ class Reader_Printer:
             self.text = self.text + line.split()
         return self.text
     
-    def write(self, code = '', file = 'index.c'):
+    def write(self, code = '', file = 'index.c', endFree = []):
          # init all needed const for code
-        HEADER = '#include <stdio.h>\n\n'
+        HEADER = '#include <stdio.h>\n \
+                  #include <string.h>\n \
+                  #include <stdlib.h>\n\n'
         MAIN_START = 'int main(int argc, char *argv[]) {\n'
         MAIN_END = 'return 0;\n}'
 
@@ -22,6 +24,9 @@ class Reader_Printer:
         f.write(HEADER)
         f.write(MAIN_START)
         f.write(code + '\n')
+        f.write('// free section\n')
+        for item in endFree:
+            f.write(f"free({item})" + ';\n')
         f.write(MAIN_END)
         f.close()
     
@@ -71,6 +76,9 @@ class Stack:
     def addFunc(self, name, type):
         self.funcs[name] = type
 
+    def addFree(self, varName):
+        self.endFree.append(varName)
+
     def __init__(self):
         self.code = ''
         self.stack = []
@@ -78,6 +86,8 @@ class Stack:
 
         self.vars = dict()
         self.funcs = dict()
+
+        self.endFree = []
     
     def collect(self):
         return self.code
@@ -99,7 +109,6 @@ class Stack:
 # regular add word
             self.stack.append({'value': word, 'type': None})
 
-    
     def colapse(self, verbose=False):
         if self.state == self.States.DEFAULT:
             code = ''
@@ -161,6 +170,7 @@ class Stack:
 
         if len(self.stack) >= 5:
             line = [item['type'] for item in self.stack[::-1][:5]][::-1]
+            print(line)
             if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.OPERATOR_TYPE, self.Types.INT_TYPE]: # def type none operator int
 # TODO : check if var already in self.vars param 
                 code = f"\n{self.stack[-4]['value']} {self.stack[-3]['value']} {self.stack[-2]['value']} {self.stack[-1]['value']};"
@@ -169,11 +179,27 @@ class Stack:
                     self.stack.pop()
                 return code
 
+# forward look for def string operator
+            line = [item['type'] for item in self.stack[:5]]
+            if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.OPERATOR_TYPE, None]: # def type none operator string ...
+# collect all word from request
+                text = ' '.join([item['value'] for item in self.stack[4:]])
+# add string var in self.vars
+# also counting spaces via lemn of the stack to be accurated in mem managment -->       v   v   v   v   v   v   v
+                code = f'\nchar * {self.stack[2]["value"]} = (char *)malloc({len(text) + len(self.stack) - 4 - 1});'
+                code += f'\n{self.stack[2]["value"]} = "{text}";'
+                self.addVar(self.stack[2]['value'], self.stack[1]['value'], len(text) + len(self.stack) - 4 - 1)
+                self.addFree(self.stack[2]['value'])
+                for i in range(len(self.stack)):
+                    self.stack.pop()
+                return code
+
         if len(self.stack) >= 4:
             line = [item['type'] for item in self.stack[::-1][:4]][::-1]
             if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.INT_TYPE]: # def string none size
-                code = f"\nchar {self.stack[-2]['value']}[{self.stack[-1]['value']}];"
+                code = f"\nchar * {{self.stack[-2]['value']}} = (char *)malloc({{self.stack[-1]['value']}});"
                 self.addVar(self.stack[-2]['value'], self.stack[-3]['value'], self.stack[-1]['value'])
+                self.addFree(self.stack[-2]['value'])
                 for i in range(4):
                     self.stack.pop()
                 return code
@@ -206,15 +232,32 @@ class Stack:
 # in int a ;
 # TODO : check for var type
                 if self.stack[-3]['value'] == 'in':
-                    code = f'\nscanf("%d", &{self.stack[-1]["value"]});'
-                    for i in range(3):
-                        self.stack.pop()
-                    return code
+                    if self.stack[-2]['value'] == 'int':
+                        code = f'\nscanf("%d", &{self.stack[-1]["value"]});'
+                        for i in range(3):
+                            self.stack.pop()
+                        return code
+                    elif self.stack[-2]['value'] == 'string':
+                        code = f'\nscanf("%s", {self.stack[-1]["value"]});'
+                        for i in range(3):
+                            self.stack.pop()
+                        return code
+                    else:
+                        raise ('\033[91mapplyPattern: out of type (in) type var\033[0m')
                 elif self.stack[-3]['value'] == 'out':
-                    code = f'\nprintf("%d", {self.stack[-1]["value"]});'
-                    for i in range(3):
-                        self.stack.pop()
-                    return code
+                    if self.stack[-2]['value'] == 'int':
+                        code = f'\nprintf("%d", {self.stack[-1]["value"]});'
+                        for i in range(3):
+                            self.stack.pop()
+                        return code
+                    elif self.stack[-2]['value'] == 'string':
+                        code = f'\nprintf("%s", {self.stack[-1]["value"]});'
+                        for i in range(3):
+                            self.stack.pop()
+                        return code
+                    else:
+                        raise ('\033[91mapplyPattern: out of type (out) type var\033[0m')
+                    
                 else:
                     raise Exception('\033[91mapplyPattern: no in func to match\033[0m')
 
@@ -249,7 +292,7 @@ if __name__ == "__main__":
     # stack.log()
     print('\033[92mStack stage complete\033[0m')
 
-    r_w.write(code)
+    r_w.write(code, endFree = stack.endFree)
     print('\033[92mPut in file stage complete\033[0m')
 
     # and compile it
