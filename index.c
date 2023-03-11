@@ -2,10 +2,8 @@
 
 int main(int argc, char *argv[]) {
 
-// i can leave coments in my code ;
-int b = 60;
-int c = 9;
-int a = c + b;
+int a;
 a = 4;
+a = a + 1;
 return 0;
 }
