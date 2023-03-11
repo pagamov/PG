@@ -1,76 +1,8 @@
-class Color:
-    OKGREEN = '\033[92m'
-    ENDC = '\033[0m'
-class PreCode:
-    # init all needed const for code
-    HEADER = '#include <stdio.h>\n\n'
-    MAIN_START = 'int main(int argc, char *argv[]) {\n'
-    MAIN_END = 'return 0;\n}'
-class States:
-    DEFAULT = 1 # 
-    COMENT = 2  #
-    COMENT_END = 3 #
-    DEFINE = 4  # start to check patterns and deside to state
+# from lib import *
 
-    ASSERT = 10 # assert to a new variable
-class Types:
-    STRING_TYPE = 'str_t'
-    INT_TYPE = 'int_t'
-    VOID_TYPE = 'void_t'
-    COMENT_TYPE = 'com_t'
-
-    VAR_TYPE = 'var_t'
-    FUNC_TYPE = 'func_t'
-    IN_FUNC_TYPE = 'in_func_t'
-    TOKEN_TYPE = 'token_t'
-    OPERATOR_TYPE = 'oper_t'
-    TYPE_TYPE = 'type_t'
-
-class Env:
-    # store vars funcs and there name and type
-    # TODO : move these to some new place mb
-    tokens = [':', ';', '(', ')']
-    operators = ['+', '-', '=', '*', '/']
-    types = ['void', 'int', 'string']
-    inFuncs = ['input', 'output']
-
-    def __init__(self):
-        self.vars = dict()
-        self.funcs = dict()
-    
-    def addVar(self, name, type):
-        self.vars[name] = type
-
-    def addFunc(self, name, type):
-        self.funcs[name] = type
-
-    def possibleTypes(self, item):
-        possible_types = []
-        if item in self.vars:       # var
-            possible_types.append(Types.VAR_TYPE)
-        elif item in self.funcs:      # func
-            possible_types.append(Types.FUNC_TYPE)
-        elif item in self.inFuncs:    # infunc
-            possible_types.append(Types.IN_FUNC_TYPE)
-        elif item in self.tokens:     # token
-            possible_types.append(Types.TOKEN_TYPE)
-        elif item in self.operators:  # operator
-            possible_types.append(Types.OPERATOR_TYPE)
-        elif item.isdigit():          # number
-            possible_types.append(Types.INT_TYPE)
-        elif item in self.types:      # type
-            possible_types.append(Types.TYPE_TYPE)
-        # TODO : what to do with this shit i dont know ???
-        # if True:                    # string
-        #     possible_types.append(Types.STRING_TYPE)
-        if possible_types == []:
-            possible_types.append(None)
-            # raise Exception('possibleTypes: no types')
-        return possible_types
-
-class Reader:
+class Reader_Printer:
     text = []
-    def read(self, file = 'index.c'):
+    def read(self, file = 'index.pg'):
         import sys
         if len(sys.argv) == 2:
             file = sys.argv[1]
@@ -78,237 +10,224 @@ class Reader:
             data = f.read()
         for line in data.splitlines():
             self.text = self.text + line.split()
-    
-    def collect(self):
         return self.text
+    
+    def write(self, code = '', file = 'index.c'):
+         # init all needed const for code
+        HEADER = '#include <stdio.h>\n\n'
+        MAIN_START = 'int main(int argc, char *argv[]) {\n'
+        MAIN_END = 'return 0;\n}'
+
+        f = open(file, 'w')
+        f.write(HEADER)
+        f.write(MAIN_START)
+        f.write(code + '\n')
+        f.write(MAIN_END)
+        f.close()
+    
+    def compile(self, file = 'index.c', res = 'index'):
+        import os
+        os.system(f'gcc {file} -o {res}')
     
     def log(self, file='Reader.log.txt'):
         f = open(file, 'w')
         for word in self.text:
             f.write(word)
             f.write(' ')
+            if word in [';', ':', ';;']:
+                f.write('\n')
         f.close()
-
-class CompressPatterns:
-    def __init__(self):
-        pass
-
-    def searchPattern(self, stack, state, env):
-        if len(stack) >= 2:
-            line = [item['type'][0] for item in stack[::-1][:2]][::-1]
-
-            if line == [Types.IN_FUNC_TYPE, Types.VAR_TYPE] and stack[-1]['value'] in env.vars:
-                # func var ;
-                if stack[-2]['value'] == 'input':
-                    pass
-                elif stack[-2]['value'] == 'output':
-                    pass
-                else:
-                    raise Exception('searchPattern: not in bould func')
-                return 'in_func int_var'
-        if len(stack) >= 3:
-            line = [item['type'][0] for item in stack[::-1][:3]][::-1]
-        if len(stack) >= 4:
-            line = [item['type'][0] for item in stack[::-1][:4]][::-1]
-        if len(stack) >= 5:
-            line = [item['type'][0] for item in stack[::-1][:5]][::-1]
-        
-        raise Exception('searchPattern: pattern not found')
-
-    def definePattern(self, stack, state, env):
-        for item in stack:
-            print(item)
-        print('\n')
-        if len(stack) >= 2:
-            line = [item['type'][0] for item in stack[::-1][:2]][::-1]
-            if line == [Types.IN_FUNC_TYPE, Types.VAR_TYPE] and stack[-1]['value'] in env.vars:
-                code = '\n'
-                # input or output
-                if stack[-2]['value'] == 'input':
-                    code += f'scanf("%d", &{stack[-1]["value"]});'
-                elif stack[-2]['value'] == 'output':
-                    code += f'printf("%d", {stack[-1]["value"]});'
-                else:
-                    code += 'null'
-                    raise Exception('dont know this in build func')
-                for i in range(2):
-                    stack.pop()
-                return code
-
-        if len(stack) >= 3:
-            line = [item['type'][0] for item in stack[::-1][:3]][::-1]
-            
-            if line == [Types.VAR_TYPE, Types.OPERATOR_TYPE, Types.VAR_TYPE]:
-                # TODO : solve this for string vars and handle string usage
-                # a + b ;
-                if stack[-3]['value'] in env.vars and stack[-1]['value'] in env.vars and stack[-3]['type'] == stack[-1]['type']:
-                    obj = { 'state': state, 'value': f"{stack[-3]['value']} {stack[-2]['value']} {stack[-1]['value']}", 'type': [Types.INT_TYPE] }
-                    for i in range(3):
-                        stack.pop()
-                    stack.append(obj)
-                    return ''
-                else:
-                    raise Exception('CompressPatterns: a + b ;')
-            # TODO : fix problem with '=' mb move it to dif type of operators
-            elif line == [Types.VAR_TYPE, Types.OPERATOR_TYPE, Types.INT_TYPE] and stack[-2]['value'] != '=':
-                # a + 3 ;
-                if stack[-3]['value'] in env.vars:
-                    obj = { 'state': state, 'value': f"{stack[-3]['value']} {stack[-2]['value']} {stack[-1]['value']}", 'type': [Types.INT_TYPE] }
-                    for i in range(3):
-                        stack.pop()
-                    stack.append(obj)
-                    return ''
-                else:
-                    raise Exception('CompressPatterns: a + 3 ;')
-            elif line == [Types.INT_TYPE, Types.OPERATOR_TYPE, Types.VAR_TYPE]:
-                # 3 + a ;
-                if stack[-1]['value'] in env.vars:
-                    obj = { 'state': state, 'value': f"{stack[-3]['value']} {stack[-2]['value']} {stack[-1]['value']}", 'type': [Types.INT_TYPE] }
-                    for i in range(3):
-                        stack.pop()
-                    stack.append(obj)
-                    return ''
-                else:
-                    raise Exception('CompressPatterns: 3 + a ;')
-            elif line == [Types.INT_TYPE, Types.OPERATOR_TYPE, Types.INT_TYPE]:
-                # 6 + 9 ;
-                if True:
-                    obj = { 'state': state, 'value': f"{stack[-3]['value']} {stack[-2]['value']} {stack[-1]['value']}", 'type': [Types.INT_TYPE] }
-                    for i in range(3):
-                        stack.pop()
-                    stack.append(obj)
-                    return ''
-                else:
-                    raise Exception('CompressPatterns: 6 + 9 ;')
-            elif line == [Types.VAR_TYPE, Types.OPERATOR_TYPE, Types.INT_TYPE]:
-                # a = 4 ;
-                if stack[-3]['value'] in env.vars:
-                    code = f"\n{stack[-3]['value']} {stack[-2]['value']} {stack[-1]['value']};"
-                    for i in range(3):
-                        stack.pop()
-                    return code
-                else:
-                    raise Exception('CompressPatterns: a = 4 ;')
-            elif line == [None, Types.TOKEN_TYPE, Types.TYPE_TYPE]:
-                # a : int ;
-                if stack[-3]['value'] not in env.vars:
-                    code = f"\n{stack[-1]['value']} {stack[-3]['value']};"
-                    env.addVar(stack[-3]['value'], stack[-1]['value'])
-                    for i in range(3):
-                        stack.pop()
-                    return code
-                else:
-                    raise Exception('CompressPatterns: a : int ;')
-                
-
-        if len(stack) >= 5:
-            line = [item['type'][0] for item in stack[::-1][:5]][::-1]
-            if line == [None, Types.TOKEN_TYPE, Types.TYPE_TYPE, Types.OPERATOR_TYPE, Types.INT_TYPE]:
-                # define new var with value
-                # a : int = 10 ;
-                code = f"\n{stack[-3]['value']} {stack[-5]['value']} {stack[-2]['value']} {stack[-1]['value']};"
-                # add new var and type
-                env.addVar(stack[-5]['value'], stack[-3]['value'])
-                for i in range(5):
-                    stack.pop()
-                return code
-        
 
 class Stack:
-    code = ''
-    env = Env()
-    comp_p = CompressPatterns()
+    class States:
+        DEFAULT = 1 # 
+        COMMENT = 2  #
+        COMMENT_END = 3 #
+        DEFINE = 4  # start to check patterns and deside to state
+        ASSERT = 10 # assert to a new variable
+    # 
+    class Types:
+        STRING_TYPE = 'str_t'
+        INT_TYPE = 'int_t'
+        VOID_TYPE = 'void_t'
+        COMMENT_TYPE = 'com_t'
+        # 
+        VAR_TYPE = 'var_t'
+        FUNC_TYPE = 'func_t'
+        IN_FUNC_TYPE = 'in_func_t'
+        TOKEN_TYPE = 'token_t'
+        OPERATOR_TYPE = 'oper_t'
+        TYPE_TYPE = 'type_t'
+    # 
+    class Tokens:
+        tokens = [':', ';', '(', ')', 'end']
+        operators = ['+', '-', '=', '*', '/', '+=', '-=', '*=', '/=', '++', '--']
+        types = ['void', 'int', 'string']
+        inFuncs = ['in', 'out', 'def']
+
+    def addVar(self, name, type):
+        self.vars[name] = type
+
+    def addFunc(self, name, type):
+        self.funcs[name] = type
 
     def __init__(self):
+        self.code = ''
         self.stack = []
-        self.state = States.DEFAULT
+        self.state = self.States.DEFAULT
+
+        self.vars = dict()
+        self.funcs = dict()
     
-    def colapse(self, state):
-        if state == States.DEFAULT:
-            # default state can be at start
-            pass
-        elif state == States.DEFINE:
-            # start search for patterns
-            # while stack have items need to search for patterns
-            newCode = self.comp_p.definePattern(self.stack, self.state, self.env)
-            # append new code of frame to code
-            self.code += newCode
-            self.state = States.DEFAULT
-        elif state == States.COMENT_END:
-            # detects coments
-            res = ''
-            while True:
-                p = self.pop()
-                assert p['state'] == States.COMENT_END or p['state'] == States.COMENT
-                if p['value'] != '/#':
-                    # still inside of coment
-                    res = p['value'] + ' ' + res
-                elif p['value'] == '/#':
-                    # reached begining of coment
-                    res = '// ' + res
-                    break
-            self.code = self.code + '\n' + res + ';'
-            
-    def add(self, item):
-        # change state
-        if item == '/#':
-            # start of coment
-            self.state = States.COMENT
-        elif item == '#/':
-            # end of coment -> colapse and add to code
-            self.state = States.COMENT_END
-        elif item == ';':
-            # end of line so need to classyfy type of operation
-            self.state = States.DEFINE
-
-        # deside what to do
-        if self.state == States.DEFAULT:
-            # check item for any types it can be and push to stack
-            possible_types = self.env.possibleTypes(item)
-            self.stack.append({ 'state': self.state, 'value': item, 'type': possible_types})
-        elif self.state == States.DEFINE:
-            self.colapse(self.state)
-        elif self.state == States.COMENT:
-            self.stack.append({ 'state': self.state, 'value': item, 'type': [Types.COMENT_TYPE]})
-        elif self.state == States.COMENT_END:
-            self.colapse(self.state)
-            self.state = States.DEFAULT
-
-    def pop(self):
-        return self.stack.pop()
-
-    def log(self, file='Stack.log.txt'):
-        import json
-        f = open(file, 'w')
-        for item in self.stack:
-            f.write(json.dumps(item))
-            f.write('\n')
-        f.close()
-
     def collect(self):
         return self.code
-    
-class Printer:
-    def write(self, code = '', file = 'index.c'):
-        f = open(file, 'w')
-        f.write(PreCode.HEADER)
-        f.write(PreCode.MAIN_START)
-        f.write(code + '\n')
-        f.write(PreCode.MAIN_END)
-        f.close()
-    
-    def compile(self, file = 'index.c', res = 'index'):
-        import os
-        os.system(f'gcc {file} -o {res}')
 
+    def add(self, word, verbose=False):
+# add new word to stack and check it for tokens
+        if word == ';;' and self.state == self.States.DEFAULT:
+# find comment start
+            self.state = self.States.COMMENT
+            self.stack.append({'value': word, 'type': self.Types.COMMENT_TYPE})
+        elif word == ';;' and self.state == self.States.COMMENT:
+# find comment end
+            self.colapse()
+            self.state = self.States.DEFAULT
+        elif word == ';' and self.state == self.States.DEFAULT:
+# end of line 
+            self.colapse(False)
+        else:
+# regular add word
+            self.stack.append({'value': word, 'type': None})
+
+    
+    def colapse(self, verbose=False):
+        if self.state == self.States.DEFAULT:
+            code = ''
+# mark stack with types
+            self.definePattern(False)
+            if verbose:
+                print("\033[94mcolapse: Stack after definePattern\033[0m")
+                for item in self.stack:
+                    print(f"{item['value']} : {item['type']}")
+                print()
+# transform stack with types to code
+            self.code = self.code + self.applyPattern(False)
+        elif self.state == self.States.COMMENT:
+            code = ''
+            while True:
+                p = self.stack.pop()['value']
+                if p == ';;':
+                    code = '\n// ' + code
+                    break
+                else:
+                    code = p + code
+            self.code = self.code + code
+
+    def definePattern(self, verbose=False):
+        for item in self.stack:
+            if item['value'] in self.vars:
+                item['type'] = self.Types.VAR_TYPE
+                
+            elif item['value'] in self.funcs:
+                item['type'] = self.Types.FUNC_TYPE
+
+            elif item['value'] in self.Tokens.inFuncs:
+                item['type'] = self.Types.IN_FUNC_TYPE
+
+            elif item['value'] in self.Tokens.tokens:
+                item['type'] = self.Types.TOKEN_TYPE
+
+            elif item['value'] in self.Tokens.operators:
+                item['type'] = self.Types.OPERATOR_TYPE
+
+            elif item['value'].isdigit():
+                item['type'] = self.Types.INT_TYPE
+
+            elif item['value'] in self.Tokens.types:
+                item['type'] = self.Types.TYPE_TYPE
+
+        if verbose:
+            print('\033[94mdefinePattern: Current stack frame:\033[0m')
+            print([f"{item['value']} : {item['type']}" for item in self.stack])
+            print()
+
+    def applyPattern(self, verbose=False):
+        code = ''
+
+        if verbose:
+            print("\033[94mapplyPattern: current line in applyPattern\033[0m")
+            print([item['type'] for item in self.stack])
+            print()
+
+        if len(self.stack) >= 2:
+            line = [item['type'] for item in self.stack[::-1][:2]][::-1]
+            if line == [self.Types.VAR_TYPE, self.Types.OPERATOR_TYPE]: # a (++ --) ;
+                code = f"\n{self.stack[-2]['value']} = {self.stack[-2]['value']} {self.stack[-1]['value'][0]} 1;"
+                for i in range(2):
+                    self.stack.pop()
+                return code
+            elif line == [self.Types.OPERATOR_TYPE, self.Types.VAR_TYPE]:  # (++ --) a ;
+                code = f"\n{self.stack[-1]['value']} = {self.stack[-1]['value']} {self.stack[-2]['value'][0]} 1;"
+                for i in range(2):
+                    self.stack.pop()
+                return code
+        if len(self.stack) >= 3:
+            line = [item['type'] for item in self.stack[::-1][:3]][::-1]
+            if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None]:   # def int a ;
+# TODO : add type to new var
+                self.addVar(self.stack[-1]['value'], self.stack[-2]['value'])
+                code = f"\n{self.stack[-2]['value']} {self.stack[-1]['value']};"
+                for i in range(3):
+                    self.stack.pop()
+                return code
+# TODO : add check if var already in self.vars
+            elif line == [self.Types.VAR_TYPE, self.Types.OPERATOR_TYPE, self.Types.INT_TYPE]: # var (+= -= *= /=) int ;
+# TODO : check for var type
+                code = f"\n{self.stack[-3]['value']} {self.stack[-2]['value']} {self.stack[-1]['value']};"
+                for i in range(3):
+                    self.stack.pop()
+                return code
+            elif line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, self.Types.VAR_TYPE]:
+# in int a ;
+# TODO : check for var type
+                if self.stack[-3]['value'] == 'in':
+                    code = f'\nscanf("%d", &{self.stack[-1]["value"]});'
+                    for i in range(3):
+                        self.stack.pop()
+                    return code
+                elif self.stack[-3]['value'] == 'out':
+                    code = f'\nprintf("%d", {self.stack[-1]["value"]});'
+                    for i in range(3):
+                        self.stack.pop()
+                    return code
+                else:
+                    raise Exception('applyPattern: no in func to match')
+
+        if len(self.stack) >= 4:
+            pass
+        
+        if len(self.stack) >= 5:
+            line = [item['type'] for item in self.stack[::-1][:5]][::-1]
+
+            if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.OPERATOR_TYPE, self.Types.INT_TYPE]:
+# TODO : check if var already in self.vars param 
+                code = f"\n{self.stack[-4]['value']} {self.stack[-3]['value']} {self.stack[-2]['value']} {self.stack[-1]['value']};"
+                self.addVar(self.stack[-3]['value'], self.stack[-4]['value'])
+                for i in range(5):
+                    self.stack.pop()
+                return code
+
+
+
+        raise Exception('applyPattern: cant find pattern')
+        return f'error: {self.stack}'
+        
 if __name__ == "__main__":
-    verbose = True
     # read code and split in apart
-    reader = Reader()
-    reader.read()
-    text = reader.collect()
-    reader.log()
-    print(Color.OKGREEN + 'Reading stage complete' + Color.ENDC)
+    r_w = Reader_Printer()
+    text = r_w.read()
+    r_w.log()
+    print('\033[92mReading stage complete\033[0m')
 
     # use stack machine to preproc tokens and translate
     stack = Stack()
@@ -316,13 +235,11 @@ if __name__ == "__main__":
         stack.add(item)
     code = stack.collect()
     # stack.log()
-    print(Color.OKGREEN + 'Stack stage complete' + Color.ENDC)
-        
-    # put code in file
-    printer = Printer()
-    printer.write(code)
-    print(Color.OKGREEN + 'Put in file stage complete' + Color.ENDC)
+    print('\033[92mStack stage complete\033[0m')
+
+    r_w.write(code)
+    print('\033[92mPut in file stage complete\033[0m')
 
     # and compile it
-    printer.compile()
-    print(Color.OKGREEN + 'Compile stage complete' + Color.ENDC)
+    r_w.compile()
+    print('\033[92mCompile stage complete\033[0m')
