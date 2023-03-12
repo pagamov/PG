@@ -14,9 +14,9 @@ class Reader_Printer:
     
     def write(self, code = '', file = 'index.c', endFree = []):
          # init all needed const for code
-        HEADER = '#include <stdio.h>\n \
-                  #include <string.h>\n \
-                  #include <stdlib.h>\n\n'
+        HEADER = '#include <stdio.h> \
+                  \n#include <string.h> \
+                  \n#include <stdlib.h>\n\n'
         MAIN_START = 'int main(int argc, char *argv[]) {\n'
         MAIN_END = 'return 0;\n}'
 
