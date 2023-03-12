@@ -23,7 +23,20 @@ a -- ;              -> a = a - 1;
 ++ a ;              -> a = a + 1;
 -- a ;              -> a = a - 1;
 
+a == b ;            -> (a == b)  \
+a > b ;             -> (a >  b)   \
+a < b ;             -> (a <  b)    \
+a >= b ;            -> (a >= b)     \
+a <= b ;            -> (a <= b)      \
+                                      [not pushed from stack]
+a == 10 ;           -> (a == 10)     /
+a > 10 ;            -> (a >  10)    /
+a < 10 ;            -> (a <  10)   /
+a >= 10 ;           -> (a >= 10)  /
+a <= 10 ;           -> (a <= 10) /
+
 def string b size_t ;   -> char b[size_t];
+
 def string b 'some text' ; -> char * b = (char *)malloc(size_t);
                               b = "some text";
 

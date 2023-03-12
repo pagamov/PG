@@ -12,7 +12,7 @@ class Reader_Printer:
             self.text = self.text + line.split()
         return self.text
     
-    def write(self, code = '', file = 'index.c', endFree = []):
+    def write(self, code = '', file = 'index.c', funcsBool = [], endFree = []):
         # init all needed const for code
         # endFree - vars malloc allocated need to be deleted 
         HEADER = '#include <stdio.h> \
@@ -23,6 +23,8 @@ class Reader_Printer:
 
         f = open(file, 'w')
         f.write(HEADER)
+        for item in funcsBool:
+            f.write("\n{}".format(item))
         f.write(MAIN_START)
         f.write(code + '\n')
         f.write('// free section\n')
@@ -65,10 +67,12 @@ class Stack:
         TOKEN_TYPE = 'token_t'
         OPERATOR_TYPE = 'oper_t'
         TYPE_TYPE = 'type_t'
+        BOOL_OPERATOR_TYPE = 'bool_oper_t'
 
     class Tokens:
         tokens = [':', ';', '(', ')', 'end']
         operators = ['+', '-', '=', '*', '/', '+=', '-=', '*=', '/=', '++', '--']
+        bool_operators = ['==', '>', '<', '>=', '<=']
         types = ['void', 'int', 'string']
         inFuncs = ['in', 'out', 'def']
 
@@ -89,7 +93,8 @@ class Stack:
         self.vars = dict()
         self.funcs = dict()
 
-        self.endFree = []
+        self.funcsBool = [] # store text of all bool funcs
+        self.endFree = [] # store names of all malloc vars via string
     
     def collect(self):
         return self.code
@@ -150,6 +155,9 @@ class Stack:
 
             elif item['value'] in self.Tokens.operators:
                 item['type'] = self.Types.OPERATOR_TYPE
+
+            elif item['value'] in self.Tokens.bool_operators:
+                item['type'] = self.Types.BOOL_OPERATOR_TYPE
 
             elif item['value'].isdigit():
                 item['type'] = self.Types.INT_TYPE
@@ -229,7 +237,7 @@ class Stack:
                 for i in range(3):
                     self.stack.pop()
                 return code
-            # TODO : add check if var already in self.vars
+                # TODO : add check if var already in self.vars
             elif line == [self.Types.VAR_TYPE, self.Types.OPERATOR_TYPE, self.Types.INT_TYPE]: # var (+= -= *= /=) int ;
                 # TODO : check for var type
                 variable = self.stack[-3]['value']
@@ -280,6 +288,35 @@ class Stack:
                 for i in range(3):
                     self.stack.pop()
                 return code
+            elif line == [self.Types.VAR_TYPE, self.Types.BOOL_OPERATOR_TYPE, self.Types.INT_TYPE]: # var (== > < >= <=) int
+                variable = self.stack[-3]['value']
+                operator = self.stack[-2]['value']
+                value = self.stack[-1]['value']
+                # add check for int type
+                variableType = self.vars[variable]['type']
+                if variableType == 'int':
+                    code = "({} {} {})".format(variable, operator, value)
+                    for i in range(3):
+                        self.stack.pop()
+                    self.stack.append({'value': code, 'type': self.Types.BOOL_TYPE})
+                    return ''
+                else:
+                    raise Exception('\033[91mapplyPattern: var (== > < >= <=) int Not int\033[0m')
+            elif line == [self.Types.VAR_TYPE, self.Types.BOOL_OPERATOR_TYPE, self.Types.VAR_TYPE]: # var (== > < >= <=) int
+                variable1 = self.stack[-3]['value']
+                operator = self.stack[-2]['value']
+                variable2 = self.stack[-1]['value']
+                # add check for int type
+                variable1Type = self.vars[variable1]['type']
+                variable2Type = self.vars[variable2]['type']
+                if variable1Type == 'int' and variable2Type == 'int':
+                    code = "({} {} {})".format(variable1, operator, variable2)
+                    for i in range(3):
+                        self.stack.pop()
+                    self.stack.append({'value': code, 'type': self.Types.BOOL_TYPE})
+                    return ''
+                else:
+                    raise Exception('\033[91mapplyPattern: var (== > < >= <=) var one of them not int\033[0m')
 
         if len(self.stack) >= 2:
             line = [item['type'] for item in self.stack[::-1][:2]][::-1]
@@ -316,7 +353,7 @@ if __name__ == "__main__":
     # stack.log()
     print('\033[92mStack stage complete\033[0m')
 
-    r_w.write(code, endFree = stack.endFree)
+    r_w.write(code, funcsBool = stack.funcsBool, endFree = stack.endFree)
     print('\033[92mPut in file stage complete\033[0m')
 
     # and compile it
