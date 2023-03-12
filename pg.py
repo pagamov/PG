@@ -13,7 +13,8 @@ class Reader_Printer:
         return self.text
     
     def write(self, code = '', file = 'index.c', endFree = []):
-         # init all needed const for code
+        # init all needed const for code
+        # endFree - vars malloc allocated need to be deleted 
         HEADER = '#include <stdio.h> \
                   \n#include <string.h> \
                   \n#include <stdlib.h>\n\n'
@@ -50,12 +51,13 @@ class Stack:
         COMMENT_END = 3 #
         DEFINE = 4  # start to check patterns and deside to state
         ASSERT = 10 # assert to a new variable
-    # 
+
     class Types:
         STRING_TYPE = 'str_t'
         INT_TYPE = 'int_t'
         VOID_TYPE = 'void_t'
         COMMENT_TYPE = 'com_t'
+        BOOL_TYPE = 'bool_t'
         # 
         VAR_TYPE = 'var_t'
         FUNC_TYPE = 'func_t'
@@ -63,7 +65,7 @@ class Stack:
         TOKEN_TYPE = 'token_t'
         OPERATOR_TYPE = 'oper_t'
         TYPE_TYPE = 'type_t'
-    # 
+
     class Tokens:
         tokens = [':', ';', '(', ')', 'end']
         operators = ['+', '-', '=', '*', '/', '+=', '-=', '*=', '/=', '++', '--']
@@ -92,34 +94,34 @@ class Stack:
     def collect(self):
         return self.code
 
-    def add(self, word, verbose=False):
-# add new word to stack and check it for tokens
+    def add(self, word, verbose = False):
+        # add new word to stack and check it for tokens
         if word == ';;' and self.state == self.States.DEFAULT:
-# find comment start
+            # find comment start
             self.state = self.States.COMMENT
             self.stack.append({'value': word, 'type': self.Types.COMMENT_TYPE})
         elif word == ';;' and self.state == self.States.COMMENT:
-# find comment end
+            # find comment end
             self.colapse()
             self.state = self.States.DEFAULT
         elif word == ';' and self.state == self.States.DEFAULT:
-# end of line 
-            self.colapse(False)
+            # end of line 
+            self.colapse(verbose)
         else:
-# regular add word
+            # regular add word
             self.stack.append({'value': word, 'type': None})
 
     def colapse(self, verbose=False):
         if self.state == self.States.DEFAULT:
             code = ''
-# mark stack with types
-            self.definePattern(True)
+            # mark stack with types
+            self.definePattern(verbose)
             if verbose:
                 print("\033[94mcolapse: Stack after definePattern\033[0m")
                 for item in self.stack:
                     print(f"{item['value']} : {item['type']}")
                 print()
-# transform stack with types to code
+            # transform stack with types to code
             self.code = self.code + self.applyPattern(True)
         elif self.state == self.States.COMMENT:
             code = ''
@@ -170,26 +172,34 @@ class Stack:
 
         if len(self.stack) >= 5:
             line = [item['type'] for item in self.stack[::-1][:5]][::-1]
-            print(line)
             if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.OPERATOR_TYPE, self.Types.INT_TYPE]: # def type none operator int
-# TODO : check if var already in self.vars param 
-                code = f"\n{self.stack[-4]['value']} {self.stack[-3]['value']} {self.stack[-2]['value']} {self.stack[-1]['value']};"
+                typ = self.stack[-4]['value']      # int
+                variable = self.stack[-3]['value'] # var
+                operator = self.stack[-2]['value'] # =
+                value = self.stack[-1]['value']    # value
+                code = "\n{} {} {} {};".format(typ, variable, operator, value)
                 self.addVar(self.stack[-3]['value'], self.stack[-4]['value'], 4)
                 for i in range(5):
                     self.stack.pop()
                 return code
 
-# forward look for def string operator
+            # forward look for def string operator
             line = [item['type'] for item in self.stack[:5]]
             if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.OPERATOR_TYPE, None]: # def type none operator string ...
-# collect all word from request
+                # collect all word from request
                 text = ' '.join([item['value'] for item in self.stack[4:]])
-# add string var in self.vars
-# also counting spaces via lemn of the stack to be accurated in mem managment -->       v   v   v   v   v   v   v
-                code = f'\nchar * {self.stack[2]["value"]} = (char *)malloc({len(text) + len(self.stack) - 4 - 1});'
-                code += f'\n{self.stack[2]["value"]} = "{text}";'
-                self.addVar(self.stack[2]['value'], self.stack[1]['value'], len(text) + len(self.stack) - 4 - 1)
-                self.addFree(self.stack[2]['value'])
+                # TODO : check if this working properly this was written at night
+                variable = self.stack[2]["value"]
+                size = len(text) + len(self.stack) - 4 - 1
+                typ = self.stack[1]['value']
+                # also counting spaces via len of the stack to be accurated in mem managment
+                code = '\nchar * {} = (char *)malloc({});'.format(variable, size)
+                code += '\n{} = "{}";'.format(variable, text)
+                # add string var in self.vars
+                self.addVar(variable, typ, size)
+                # add variable to free list
+                self.addFree(variable)
+                # clear self.stack
                 for i in range(len(self.stack)):
                     self.stack.pop()
                 return code
@@ -197,9 +207,12 @@ class Stack:
         if len(self.stack) >= 4:
             line = [item['type'] for item in self.stack[::-1][:4]][::-1]
             if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None, self.Types.INT_TYPE]: # def string none size
-                code = f"\nchar * {{self.stack[-2]['value']}} = (char *)malloc({{self.stack[-1]['value']}});"
-                self.addVar(self.stack[-2]['value'], self.stack[-3]['value'], self.stack[-1]['value'])
-                self.addFree(self.stack[-2]['value'])
+                variable = self.stack[-2]['value']
+                size = self.stack[-1]['value']
+                typ = self.stack[-3]['value']
+                code = "\nchar * {} = (char *)malloc({});".format(variable, size)
+                self.addVar(variable, typ, size)
+                self.addFree(variable)
                 for i in range(4):
                     self.stack.pop()
                 return code
@@ -207,70 +220,81 @@ class Stack:
         if len(self.stack) >= 3:
             line = [item['type'] for item in self.stack[::-1][:3]][::-1]
             if line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, None]:   # def int a ;
-# TODO : add type to new var
-                self.addVar(self.stack[-1]['value'], self.stack[-2]['value'], 4)
-                code = f"\n{self.stack[-2]['value']} {self.stack[-1]['value']};"
+                # TODO : add type to new var
+                typ = self.stack[-2]['value']
+                variable = self.stack[-1]['value']
+                size = 4
+                code = "\n{} {};".format(typ, variable)
+                self.addVar(variable, typ, size)
                 for i in range(3):
                     self.stack.pop()
                 return code
-# TODO : add check if var already in self.vars
+            # TODO : add check if var already in self.vars
             elif line == [self.Types.VAR_TYPE, self.Types.OPERATOR_TYPE, self.Types.INT_TYPE]: # var (+= -= *= /=) int ;
-# TODO : check for var type
-                code = f"\n{self.stack[-3]['value']} {self.stack[-2]['value']} {self.stack[-1]['value']};"
+                # TODO : check for var type
+                variable = self.stack[-3]['value']
+                operator = self.stack[-2]['value']
+                value = self.stack[-1]['value']
+                code = "\n{} {} {};".format(variable, operator, value)
                 for i in range(3):
                     self.stack.pop()
                 return code
             elif line == [self.Types.VAR_TYPE, self.Types.OPERATOR_TYPE, self.Types.VAR_TYPE]: # var (+= -= *= /=) var ;
-# check if they are same type
-# if var int (+= -= *= /=) var int
-                if self.vars[self.stack[-1]['value']]['type'] == 'int' and self.vars[self.stack[-3]['value']]['type'] == 'int':
-                    code = f"\n{self.stack[-3]['value']} {self.stack[-2]['value']} {self.stack[-1]['value']};"
+                # check if they are same type
+                variable1 = self.stack[-1]['value']
+                variable2 = self.stack[-3]['value']
+                variable1Type = self.vars[variable1]['type']
+                variable2Type = self.vars[variable2]['type']
+                operator = self.stack[-2]['value']
+                # if var int (+= -= *= /=) var int
+                if variable1Type == 'int' and variable2Type == 'int':
+                    code = "\n{} {} {};".format(variable2, operator, variable1)
+                else:
+                    raise Exception('\033[91mapplyPattern: var += var not int\033[0m')
                 for i in range(3):
                     self.stack.pop()
                 return code
             elif line == [self.Types.IN_FUNC_TYPE, self.Types.TYPE_TYPE, self.Types.VAR_TYPE]: # (in out) type var ;
-# in int a ;
-# TODO : check for var type
-                if self.stack[-3]['value'] == 'in':
-                    if self.stack[-2]['value'] == 'int':
-                        code = f'\nscanf("%d", &{self.stack[-1]["value"]});'
-                        for i in range(3):
-                            self.stack.pop()
-                        return code
-                    elif self.stack[-2]['value'] == 'string':
-                        code = f'\nscanf("%s", {self.stack[-1]["value"]});'
-                        for i in range(3):
-                            self.stack.pop()
-                        return code
+                # in int a ;
+                # TODO : check for var type
+                func = self.stack[-3]['value']
+                typ = self.stack[-2]['value']
+                variable = self.stack[-1]["value"]
+                code = ''
+                if func == 'in':
+                    if typ == 'int':
+                        code += '\nscanf("%d", &{});'.format(variable)
+                    elif typ == 'string':
+                        code += '\nscanf("%s", {});'.format(variable)
                     else:
                         raise ('\033[91mapplyPattern: out of type (in) type var\033[0m')
-                elif self.stack[-3]['value'] == 'out':
-                    if self.stack[-2]['value'] == 'int':
-                        code = f'\nprintf("%d", {self.stack[-1]["value"]});'
-                        for i in range(3):
-                            self.stack.pop()
-                        return code
-                    elif self.stack[-2]['value'] == 'string':
-                        code = f'\nprintf("%s", {self.stack[-1]["value"]});'
-                        for i in range(3):
-                            self.stack.pop()
-                        return code
+                elif func == 'out':
+                    if typ == 'int':
+                        code += '\nprintf("%d", {});'.format(variable)
+                    elif typ == 'string':
+                        code += '\nprintf("%s", {});'.format(variable)
                     else:
                         raise ('\033[91mapplyPattern: out of type (out) type var\033[0m')
-                    
                 else:
                     raise Exception('\033[91mapplyPattern: no in func to match\033[0m')
+                for i in range(3):
+                    self.stack.pop()
+                return code
 
         if len(self.stack) >= 2:
             line = [item['type'] for item in self.stack[::-1][:2]][::-1]
             if line == [self.Types.VAR_TYPE, self.Types.OPERATOR_TYPE]: # a (++ --) ;
-                code = f"\n{self.stack[-2]['value']} = {self.stack[-2]['value']} {self.stack[-1]['value'][0]} 1;"
+                variable = self.stack[-2]['value']
+                operator = self.stack[-1]['value'][0]
+                code = "\n{} = {} {} 1;".format(variable, variable, operator)
                 for i in range(2):
                     self.stack.pop()
                 return code
             elif line == [self.Types.OPERATOR_TYPE, self.Types.VAR_TYPE]:  # (++ --) a ;
-# TODO : conflict with var += var ; 
-                code = f"\n{self.stack[-1]['value']} = {self.stack[-1]['value']} {self.stack[-2]['value'][0]} 1;"
+                # TODO : conflict with var += var ; 
+                variable = self.stack[-1]['value']
+                operator = self.stack[-2]['value'][0]
+                code = "\n{} = {} {} 1;".format(variable, variable, operator)
                 for i in range(2):
                     self.stack.pop()
                 return code
