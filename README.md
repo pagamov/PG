@@ -2,16 +2,39 @@
 
 ;; coment ;;
 
-def int a ;         -> int a;
-def int a = 10 ;    -> int a = 10;
+<table>
+    <tr><th>Исходный код</th><th>Итоговый</th></tr>
+    <tr><td>def int a ;</td><td>int a;</td></tr>
+    <tr><td>def int a = 10 ;</td><td>int a = 10;</td></tr>
+</table>
 
-in int a ;          -> scanf("%d", &a);
-out int a ;         -> printf("%d", a);
+<table>
+    <tr><th>Исходный код</th><th>Итоговый</th></tr>
+    <tr><td>in int a ;</td>scanf("%d", &a);<td></td></tr>
+    <tr><td>out int a ;</td>printf("%d", a);<td></td></tr>
+</table>
 
-a += 4 ;            -> a += 4;
-a -= 5 ;            -> a -= 5;
-a *= 10 ;           -> a *= 10;
-a /= 2 ;            -> a /= 2;
+<table>
+    <tr><th>Исходный код</th><th>Итоговый</th></tr>
+    <tr><td>a += 4 ;</td><td>a += 4;</td></tr>
+    <tr><td>a -= 5 ;</td><td></td></tr>
+    <tr><td>a *= 10 ;</td><td></td></tr>
+    <tr><td>a /= 2 ;</td><td></td></tr>
+</table>
+
+<table>
+    <tr><th>Исходный код</th><th>Итоговый</th></tr>
+    <tr><td></td><td></td></tr>
+    <tr><td></td><td></td></tr>
+</table>
+
+          -> 
+         -> 
+
+            -> 
+            -> a -= 5;
+           -> a *= 10;
+            -> a /= 2;
 
 a += b ;            -> a += b;
 a -= b ;            -> a -= b;

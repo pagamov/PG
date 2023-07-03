@@ -14,7 +14,7 @@ class Reader_Printer:
     
     def write(self, code = '', file = 'index.c', funcsBool = [], endFree = []):
         # init all needed const for code
-        # endFree - vars malloc allocated need to be deleted 
+        # endFree - vars malloc allocated need to be deleted
         HEADER = '#include <stdio.h> \
                   \n#include <string.h> \
                   \n#include <stdlib.h>\n\n'
